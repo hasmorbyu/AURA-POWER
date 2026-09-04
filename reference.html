@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AURA | AI-Driven Utility & Redistribution Architecture [SLDC Delhi]</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      /* Palette Extracted from Screenshot GIS Interface */
+      --bg-map: #06080c;
+      --bg-sidebar: #0b0f17;
+      --bg-panel: #0e141f;
+      --bg-card: #131a28;
+      --bg-card-hover: #182234;
+      --border-subtle: #1a2436;
+      --border-accent: #26354d;
+      
+      /* Voltage Line Color Specs from Screenshot Legend */
+      --color-hvdc: #d946ef;      /* HVDC / Storage Magenta */
+      --color-765kv: #ffffff;     /* 765kV+ White */
+      --color-500kv: #00e5ff;     /* 500-734kV Cyan */
+      --color-345kv: #0284c7;     /* 345-499kV Blue-Cyan */
+      --color-220kv: #3b82f6;     /* 220-344kV Deep Blue */
+      --color-100kv: #8b5cf6;     /* 100-219kV Purple */
+      --color-31kv:  #ec4899;     /* 31-99kV Light Magenta */
+
+      /* Generation & Alert Palette from Screenshot */
+      --solar-yellow: #fbbf24;
+      --wind-cyan: #38bdf8;
+      --hydro-teal: #06b6d4;
+      --nuclear-green: #10b981;
+      --coal-red: #ef4444;
+      --gas-indigo: #6366f1;
+      
+      --text-main: #e2e8f0;
+      --text-muted: #7e90a8;
+      --text-dim: #4b5e78;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    
+    body { 
+      background-color: var(--bg-map); 
+      color: var(--text-main); 
+      display: flex; 
+      flex-direction: column; 
+      height: 100vh; 
+      overflow: hidden; 
+      font-family: 'Rajdhani', -apple-system, sans-serif; 
+    }
+
+    /* Top Navigation Bar Header */
+    header {
+      height: 60px; 
+      background: var(--bg-sidebar); 
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between; 
+      padding: 0 20px;
+      z-index: 100;
+    }
+
+    .brand-container {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .aura-logo-svg {
+      height: 38px;
+      width: auto;
+      display: block;
+    }
+
+    .brand-tagline {
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 1.5px;
+      padding-left: 14px;
+      border-left: 1px solid var(--border-subtle);
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .beta-badge {
+      background: rgba(251, 191, 36, 0.15);
+      color: var(--solar-yellow);
+      border: 1px solid rgba(251, 191, 36, 0.4);
+      border-radius: 3px;
+      padding: 1px 5px;
+      font-size: 9px;
+      font-weight: 700;
+    }
+
+    .header-telemetry {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+    }
+
+    .telemetry-pill { 
+      background: rgba(16, 185, 129, 0.1); 
+      border: 1px solid rgba(16, 185, 129, 0.4); 
+      border-radius: 4px; 
+      padding: 5px 12px; 
+      color: var(--nuclear-green); 
+      font-weight: 600;
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .telemetry-pill.alert { 
+      background: rgba(239, 68, 68, 0.15); 
+      border-color: var(--coal-red); 
+      color: var(--coal-red); 
+      animation: pulse-alert 1.2s infinite; 
+    }
+    .telemetry-pill .indicator-dot {
+      width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor;
+    }
+
+    /* Workspace Layout */
+    .workspace { display: flex; flex: 1; height: calc(100vh - 60px); position: relative; }
+
+    /* Left Control & GIS Sidebar */
+    .sidebar { 
+      width: 320px; 
+      background: var(--bg-sidebar); 
+      border-right: 1px solid var(--border-subtle); 
+      display: flex; 
+      flex-direction: column; 
+      z-index: 20; 
+      overflow-y: auto;
+    }
+
+    .sidebar-section {
+      padding: 16px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .section-title { 
+      font-size: 11px; 
+      text-transform: uppercase; 
+      letter-spacing: 1.5px; 
+      color: var(--text-muted); 
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Power Plant Generation Breakdown (Matching Screenshot Sidebar) */
+    .plant-stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+    }
+    .plant-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .plant-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-muted);
+    }
+    .plant-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+    }
+
+    /* Transmission Voltage Legend (Exact matching Screenshot) */
+    .voltage-legend {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      margin-top: 4px;
+    }
+    .voltage-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-muted);
+    }
+    .voltage-line-sample {
+      width: 28px;
+      height: 3px;
+      border-radius: 1px;
+    }
+
+    /* Controls UI */
+    .control-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+    .control-label { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-main); font-weight: 600; }
+    .control-label span.value { color: var(--color-500kv); font-family: 'JetBrains Mono', monospace; font-weight: bold; }
+    
+    input[type=range] { 
+      width: 100%; 
+      accent-color: var(--color-500kv); 
+      cursor: pointer; 
+      background: var(--bg-card);
+      height: 6px;
+      border-radius: 3px;
+    }
+
+    .btn-contingency {
+      background: var(--bg-card); 
+      border: 1px solid var(--border-accent); 
+      color: var(--text-main); 
+      padding: 10px 12px;
+      border-radius: 4px; 
+      font-size: 12px; 
+      cursor: pointer; 
+      text-align: left; 
+      transition: all 0.2s ease;
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 600; 
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    .btn-contingency.active { 
+      border-color: var(--coal-red); 
+      background: rgba(239, 68, 68, 0.15); 
+      color: #ff8585; 
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+    }
+    .btn-contingency:hover:not(.active) { 
+      background: var(--bg-card-hover); 
+      border-color: var(--color-500kv);
+    }
+
+    /* Viewport & Canvas */
+    .viewport-container { 
+      flex: 1; 
+      position: relative; 
+      overflow: hidden; 
+      background: radial-gradient(circle at center, #0d131f 0%, #040609 100%); 
+    }
+    canvas#gridCanvas { width: 100%; height: 100%; display: block; }
+
+    /* Map Overlay Floating Tools (Screenshot aesthetic) */
+    .map-tools-bar {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 30;
+    }
+    .tool-btn {
+      width: 36px;
+      height: 36px;
+      background: rgba(14, 20, 31, 0.85);
+      border: 1px solid var(--border-accent);
+      border-radius: 6px;
+      color: var(--color-500kv);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      transition: all 0.2s ease;
+    }
+    .tool-btn:hover {
+      background: rgba(0, 229, 255, 0.15);
+      border-color: var(--color-500kv);
+      box-shadow: 0 0 12px rgba(0, 229, 255, 0.3);
+    }
+
+    /* Floating Substation HUD Elements */
+    .hud-card {
+      position: absolute; 
+      pointer-events: none; 
+      background: rgba(11, 15, 23, 0.92);
+      border: 1px solid rgba(0, 229, 255, 0.4); 
+      border-radius: 6px; 
+      padding: 8px 14px;
+      transform: translate(-50%, -130%); 
+      backdrop-filter: blur(8px); 
+      box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+      transition: border-color 0.3s, box-shadow 0.3s;
+      z-index: 25;
+    }
+    .hud-card.warning {
+      border-color: var(--solar-yellow);
+      box-shadow: 0 0 16px rgba(251, 191, 36, 0.3);
+    }
+    .hud-card.critical { 
+      border-color: var(--coal-red); 
+      box-shadow: 0 0 20px rgba(239, 68, 68, 0.5); 
+    }
+    .hud-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 4px;
+    }
+    .hud-title { 
+      font-size: 10px; 
+      text-transform: uppercase; 
+      letter-spacing: 1px; 
+      color: var(--text-muted); 
+      font-weight: 700; 
+    }
+    .hud-voltage-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      padding: 1px 4px;
+      border-radius: 2px;
+      background: rgba(0, 229, 255, 0.15);
+      color: var(--color-500kv);
+      border: 1px solid rgba(0, 229, 255, 0.3);
+    }
+    .hud-stat { 
+      font-size: 15px; 
+      font-weight: 700; 
+      color: var(--text-main); 
+      font-family: 'JetBrains Mono', monospace; 
+    }
+    .hud-progress-bg {
+      width: 100%;
+      height: 4px;
+      background: var(--border-subtle);
+      border-radius: 2px;
+      margin-top: 6px;
+      overflow: hidden;
+    }
+    .hud-progress-fill {
+      height: 100%;
+      width: 50%;
+      background: var(--color-500kv);
+      transition: width 0.3s ease, background-color 0.3s ease;
+    }
+
+    /* Right Telemetry & AI Dispatch Panel */
+    .dispatch-panel { 
+      width: 350px; 
+      background: var(--bg-sidebar); 
+      border-left: 1px solid var(--border-subtle); 
+      padding: 16px; 
+      display: flex; 
+      flex-direction: column; 
+      gap: 16px; 
+      z-index: 20; 
+    }
+
+    .ai-box {
+      background: var(--bg-card); 
+      padding: 14px; 
+      border-radius: 6px; 
+      border: 1px solid var(--border-accent);
+      position: relative;
+      overflow: hidden;
+    }
+    .ai-box::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; width: 3px; height: 100%;
+      background: var(--color-500kv);
+      box-shadow: 0 0 10px var(--color-500kv);
+    }
+
+    .log-box {
+      flex: 1; 
+      background: #04070b; 
+      border: 1px solid var(--border-subtle); 
+      border-radius: 6px; 
+      padding: 12px;
+      font-family: 'JetBrains Mono', monospace; 
+      font-size: 11px; 
+      color: #94a3b8; 
+      display: flex; 
+      flex-direction: column; 
+      gap: 8px; 
+      overflow-y: auto;
+      max-height: calc(100vh - 380px);
+    }
+    .log-entry { line-height: 1.4; border-left: 2px solid var(--color-500kv); padding-left: 8px; }
+    .log-entry.warn { border-color: var(--solar-yellow); color: #fde047; }
+    .log-entry.danger { border-color: var(--coal-red); color: #fca5a5; }
+    .log-entry.success { border-color: var(--nuclear-green); color: #6ee7b7; }
+
+    .btn-rebalance {
+      background: var(--color-500kv); 
+      border: none; 
+      border-radius: 5px; 
+      color: #04070b; 
+      font-weight: 700;
+      padding: 13px; 
+      cursor: pointer; 
+      text-transform: uppercase; 
+      letter-spacing: 1.5px; 
+      font-size: 13px;
+      box-shadow: 0 0 16px rgba(0, 229, 255, 0.4); 
+      transition: all 0.2s ease; 
+      font-family: 'Rajdhani', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn-rebalance:hover { 
+      background: #38bdf8; 
+      box-shadow: 0 0 24px rgba(0, 229, 255, 0.6); 
+      transform: translateY(-1px);
+    }
+
+    @keyframes pulse-alert {
+      0%, 100% { border-color: var(--coal-red); box-shadow: 0 0 6px var(--coal-red); }
+      50% { border-color: transparent; box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top SLDC Navigation Header -->
+  <header>
+    <div class="brand-container">
+      <!-- High-Voltage Transmission AURA Logo -->
+      <svg class="aura-logo-svg" viewBox="0 0 210 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="wire-glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="1.5" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+
+          <radialGradient id="node-glow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#00e5ff" stop-opacity="1" />
+            <stop offset="60%" stop-color="#38bdf8" stop-opacity="0.8" />
+            <stop offset="100%" stop-color="#38bdf8" stop-opacity="0" />
+          </radialGradient>
+        </defs>
+
+        <!-- Transmission Sag Cables -->
+        <path d="M 0 10 Q 20 14, 21 8 Q 50 16, 65 10 Q 95 16, 110 8 Q 135 15, 153 8 Q 185 14, 210 10" 
+              stroke="rgba(0, 229, 255, 0.3)" stroke-width="1.2" fill="none"/>
+
+        <path d="M 0 28 Q 12 32, 21 34 Q 40 38, 65 30 Q 85 36, 110 27 Q 130 36, 153 34 Q 180 32, 210 28" 
+              stroke="rgba(217, 70, 239, 0.35)" stroke-width="1" fill="none"/>
+
+        <!-- Animated High-Voltage Electric Pulse -->
+        <path d="M 0 10 Q 20 14, 21 8 Q 50 16, 65 10 Q 95 16, 110 8 Q 135 15, 153 8 Q 185 14, 210 10" 
+              stroke="#00e5ff" stroke-width="1.8" stroke-dasharray="8 60" fill="none" filter="url(#wire-glow)">
+          <animate attributeName="stroke-dashoffset" from="200" to="0" dur="2.4s" repeatCount="indefinite" />
+        </path>
+
+        <!-- AURA Typography -->
+        <!-- 'A' 1 -->
+        <path d="M 6 46 L 17 9 C 19 3, 23 3, 25 9 L 36 46" 
+              stroke="#ffffff" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="21" cy="34" r="6" fill="url(#node-glow)" />
+        <circle cx="21" cy="34" r="2.8" fill="#00e5ff" />
+
+        <!-- 'U' -->
+        <path d="M 48 6 L 48 30 C 48 41, 56 46, 65 46 C 74 46, 82 41, 82 30 L 82 6" 
+              stroke="#ffffff" stroke-width="3.8" stroke-linecap="round"/>
+
+        <!-- 'R' -->
+        <path d="M 94 46 L 94 6 L 112 6 C 122 6, 126 12, 126 19 C 126 27, 120 28, 112 28 L 94 28 M 111 28 L 126 46" 
+              stroke="#ffffff" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/>
+
+        <!-- 'A' 2 -->
+        <path d="M 138 46 L 149 9 C 151 3, 155 3, 157 9 L 168 46" 
+              stroke="#ffffff" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="153" cy="34" r="6" fill="url(#node-glow)" />
+        <circle cx="153" cy="34" r="2.8" fill="#00e5ff" />
+
+        <!-- Feeder lines -->
+        <line x1="21" y1="8" x2="21" y2="34" stroke="#00e5ff" stroke-width="1.2" stroke-dasharray="2 3" opacity="0.85"/>
+        <line x1="153" y1="8" x2="153" y2="34" stroke="#00e5ff" stroke-width="1.2" stroke-dasharray="2 3" opacity="0.85"/>
+      </svg>
+
+      <span class="brand-tagline">
+        AI Utility & Redistribution Architecture
+        <span class="beta-badge">SLDC DELHI</span>
+      </span>
+    </div>
+
+    <div class="header-telemetry">
+      <div class="telemetry-pill" id="gridStatusPill">
+        <div class="indicator-dot"></div>
+        <span id="gridStatusText">GRID NOMINAL</span>
+      </div>
+      <div>
+        <span style="color: var(--text-muted);">DELHI NET DEMAND:</span>
+        <strong id="totalDemand" style="color: #ffffff; font-size: 14px; margin-left: 6px;">6,840 MW</strong>
+        <span style="color: var(--text-dim); font-size: 11px;">/ 8,200 MW CAP</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <!-- Left Control & GIS Sidebar (Exact Color & Structure Matching Screenshot) -->
+    <div class="sidebar">
+      
+      <!-- Power Generation Summary (From Screenshot Sidebar) -->
+      <div class="sidebar-section">
+        <div class="section-title">
+          <span>DELHI POWER PLANTS</span>
+          <span style="color: var(--color-500kv); font-family: monospace;">4 HUB / 8.2GW</span>
+        </div>
+        <div class="plant-stats-grid">
+          <div class="plant-row">
+            <span class="plant-label"><span class="plant-dot" style="background: var(--solar-yellow)"></span> Solar</span>
+            <span id="statSolar">1,240 MW</span>
+          </div>
+          <div class="plant-row">
+            <span class="plant-label"><span class="plant-dot" style="background: var(--wind-cyan)"></span> Gas / CCGT</span>
+            <span id="statGas">2,400 MW</span>
+          </div>
+          <div class="plant-row">
+            <span class="plant-label"><span class="plant-dot" style="background: var(--coal-red)"></span> Thermal Intertie</span>
+            <span id="statThermal">3,100 MW</span>
+          </div>
+          <div class="plant-row">
+            <span class="plant-label"><span class="plant-dot" style="background: var(--nuclear-green)"></span> Hydro / Storage</span>
+            <span id="statHydro">1,100 MW</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Transmission Voltage Color Legend (Exact match to Screenshot) -->
+      <div class="sidebar-section">
+        <div class="section-title">TRANSMISSION GRID LAYERS</div>
+        <div class="voltage-legend">
+          <div class="voltage-item">
+            <div class="voltage-line-sample" style="background: var(--color-hvdc)"></div>
+            <span>HVDC Inter-State Lines</span>
+          </div>
+          <div class="voltage-item">
+            <div class="voltage-line-sample" style="background: var(--color-765kv)"></div>
+            <span>765 kV Primary Corridor</span>
+          </div>
+          <div class="voltage-item">
+            <div class="voltage-line-sample" style="background: var(--color-500kv)"></div>
+            <span>400-734 kV Bawana Ring</span>
+          </div>
+          <div class="voltage-item">
+            <div class="voltage-line-sample" style="background: var(--color-220kv)"></div>
+            <span>220-344 kV Regional Interties</span>
+          </div>
+          <div class="voltage-item">
+            <div class="voltage-line-sample" style="background: var(--color-100kv)"></div>
+            <span>100-219 kV Substation Feeders</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dynamic "What-If" Sandbox Controls -->
+      <div class="sidebar-section">
+        <div class="section-title">"WHAT-IF" CLIMATE SANDBOX</div>
+
+        <div class="control-group">
+          <div class="control-label">
+            <span>Heatwave Surge (&Delta;T)</span>
+            <span class="value" id="valTemp">+0.0 °C</span>
+          </div>
+          <input type="range" id="sliderTemp" min="0" max="6" step="0.5" value="0">
+        </div>
+
+        <div class="control-group">
+          <div class="control-label">
+            <span>Solar Ramp Drop (Cloud Cover)</span>
+            <span class="value" id="valCloud">10%</span>
+          </div>
+          <input type="range" id="sliderCloud" min="0" max="100" step="5" value="10">
+        </div>
+      </div>
+
+      <!-- Contingency Toggles -->
+      <div class="sidebar-section">
+        <div class="section-title">HARDWARE CONTINGENCY EVENTS</div>
+        
+        <button class="btn-contingency" id="btnTripT3" onclick="toggleTrip(3)">
+          <span>TRIP OKHLA TRANSFORMER 03</span>
+          <span style="font-family: monospace; font-size: 11px;">[OFF]</span>
+        </button>
+
+        <button class="btn-contingency" id="btnTripLine" onclick="toggleLineTrip()">
+          <span>TRIP BAWANA-GHAZIPUR 400kV</span>
+          <span style="font-family: monospace; font-size: 11px;">[OFF]</span>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- Center Viewport & Canvas HUD -->
+    <div class="viewport-container" id="container">
+      <canvas id="gridCanvas"></canvas>
+
+      <!-- Map Floating Tools (Matching Screenshot) -->
+      <div class="map-tools-bar">
+        <div class="tool-btn" title="Search Grid Nodes">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        </div>
+        <div class="tool-btn" title="Recenter Grid Map">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/></svg>
+        </div>
+        <div class="tool-btn" title="Toggle Heatmap Layer">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2v20M2 12h20M5 5l14 14M19 5L5 19"/></svg>
+        </div>
+      </div>
+
+      <!-- Substation Floating Telemetry Cards -->
+      <div class="hud-card" id="hudSub0">
+        <div class="hud-header">
+          <span class="hud-title">BAWANA 400kV (NORTH)</span>
+          <span class="hud-voltage-badge">400 kV</span>
+        </div>
+        <div class="hud-stat" id="statSub0">1,820 / 2,200 MW</div>
+        <div class="hud-progress-bg"><div class="hud-progress-fill" id="barSub0"></div></div>
+      </div>
+
+      <div class="hud-card" id="hudSub1">
+        <div class="hud-header">
+          <span class="hud-title">OKHLA RING (SOUTH)</span>
+          <span class="hud-voltage-badge">220 kV</span>
+        </div>
+        <div class="hud-stat" id="statSub1">2,100 / 2,300 MW</div>
+        <div class="hud-progress-bg"><div class="hud-progress-fill" id="barSub1"></div></div>
+      </div>
+
+      <div class="hud-card" id="hudSub2">
+        <div class="hud-header">
+          <span class="hud-title">GHAZIPUR INTERTIE (EAST)</span>
+          <span class="hud-voltage-badge">220 kV</span>
+        </div>
+        <div class="hud-stat" id="statSub2">1,450 / 1,900 MW</div>
+        <div class="hud-progress-bg"><div class="hud-progress-fill" id="barSub2"></div></div>
+      </div>
+
+      <div class="hud-card" id="hudSub3">
+        <div class="hud-header">
+          <span class="hud-title">NDMC CORE (CENTRAL)</span>
+          <span class="hud-voltage-badge">132 kV</span>
+        </div>
+        <div class="hud-stat" id="statSub3">1,470 / 1,800 MW</div>
+        <div class="hud-progress-bg"><div class="hud-progress-fill" id="barSub3"></div></div>
+      </div>
+    </div>
+
+    <!-- Right AI Dispatch & Telemetry Panel -->
+    <div class="dispatch-panel">
+      <div class="section-title">AI REDISTRIBUTION AGENT</div>
+      
+      <div class="ai-box">
+        <div style="font-size: 10px; color: var(--text-muted); margin-bottom: 6px; font-weight: 700; letter-spacing: 1px;">AUTONOMOUS DISPATCH ADVISORY</div>
+        <div style="font-size: 13px; color: var(--color-500kv); line-height: 1.5; font-weight: 500;" id="aiRecommendation">
+          System operating within safe thermal ratings. All interties nominal.
+        </div>
+      </div>
+
+      <div class="section-title" style="margin-top: 4px;">SLDC DISPATCH AUDIT LOGS</div>
+      <div class="log-box" id="logBox">
+        <div class="log-entry">[04:00:00] Telemetry connected. Delhi SLDC 400kV/220kV/132kV grid online.</div>
+      </div>
+
+      <button class="btn-rebalance" onclick="triggerOptimization()">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        Execute LP Rebalance
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('gridCanvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('container');
+
+    let width, height, centerX, centerY;
+    let animOffset = 0;
+    let isT3Tripped = false;
+    let isLineTripped = false;
+
+    // Substation Node Definitions (Isometric Space)
+    const substations = [
+      { id: 0, name: "Bawana (North)", isoX: -200, isoY: -80, baseMW: 1820, maxMW: 2200, currentMW: 1820, voltage: "400kV" },
+      { id: 1, name: "Okhla (South)", isoX: 200, isoY: 90, baseMW: 2100, maxMW: 2300, currentMW: 2100, voltage: "220kV" },
+      { id: 2, name: "Ghazipur (East)", isoX: 200, isoY: -110, baseMW: 1450, maxMW: 1900, currentMW: 1450, voltage: "220kV" },
+      { id: 3, name: "NDMC (Central)", isoX: -150, isoY: 110, baseMW: 1470, maxMW: 1800, currentMW: 1470, voltage: "132kV" }
+    ];
+
+    // High Voltage Lines matching palette
+    const powerlines = [
+      { from: 0, to: 2, voltage: '400kV', color: '#00e5ff', width: 3.5 },
+      { from: 2, to: 1, voltage: '220kV', color: '#3b82f6', width: 2.5 },
+      { from: 1, to: 3, voltage: '132kV', color: '#8b5cf6', width: 2.0 },
+      { from: 3, to: 0, voltage: '220kV', color: '#3b82f6', width: 2.5 },
+      { from: 0, to: 1, voltage: '765kV', color: '#ffffff', width: 4.0 }
+    ];
+
+    function resize() {
+      width = canvas.width = container.clientWidth;
+      height = canvas.height = container.clientHeight;
+      centerX = width / 2;
+      centerY = height / 2;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function toScreen(isoX, isoY, z = 0) {
+      return {
+        x: centerX + (isoX - isoY),
+        y: centerY + (isoX + isoY) * 0.5 - z
+      };
+    }
+
+    // Render Isometric Infrastructure
+    function drawIsometricBlock(isoX, isoY, sizeX, sizeY, height, baseColor, topColor, accentGlow = null) {
+      const p1 = toScreen(isoX, isoY, 0);
+      const p2 = toScreen(isoX + sizeX, isoY, 0);
+      const p3 = toScreen(isoX + sizeX, isoY + sizeY, 0);
+      const p4 = toScreen(isoX, isoY + sizeY, 0);
+
+      const t1 = toScreen(isoX, isoY, height);
+      const t2 = toScreen(isoX + sizeX, isoY, height);
+      const t3 = toScreen(isoX + sizeX, isoY + sizeY, height);
+      const t4 = toScreen(isoX, isoY + sizeY, height);
+
+      // Left Face
+      ctx.fillStyle = baseColor;
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y); ctx.lineTo(p4.x, p4.y); ctx.lineTo(t4.x, t4.y); ctx.lineTo(t1.x, t1.y);
+      ctx.closePath(); ctx.fill();
+
+      // Right Face
+      ctx.fillStyle = '#080c14';
+      ctx.beginPath();
+      ctx.moveTo(p4.x, p4.y); ctx.lineTo(p3.x, p3.y); ctx.lineTo(t3.x, t3.y); ctx.lineTo(t4.x, t4.y);
+      ctx.closePath(); ctx.fill();
+
+      // Top Roof Face
+      ctx.fillStyle = topColor;
+      ctx.beginPath();
+      ctx.moveTo(t1.x, t1.y); ctx.lineTo(t2.x, t2.y); ctx.lineTo(t3.x, t3.y); ctx.lineTo(t4.x, t4.y);
+      ctx.closePath(); ctx.fill();
+
+      if (accentGlow) {
+        ctx.strokeStyle = accentGlow;
+        ctx.lineWidth = 1.5;
+        ctx.shadowColor = accentGlow;
+        ctx.shadowBlur = 10;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+    }
+
+    // Render Catenary Laser Conduits (3-Layer Glow Architecture + Heat Sag + Thermal Flicker)
+    function drawNeonLine(pFrom, pTo, baseColor, stressRatio, isTrippedLine = false) {
+      // 1. Shape & Curvature: Quadratic Bézier Catenary Curve
+      let sag = 18; // Base sag in px under gravity
+      if (stressRatio > 0.92) {
+        sag *= 1.30; // 30% dynamic heat sag expansion under thermal overload
+      }
+      
+      const midX = (pFrom.x + pTo.x) / 2;
+      const midY = (pFrom.y + pTo.y) / 2 + sag;
+
+      const tracePath = () => {
+        ctx.beginPath();
+        ctx.moveTo(pFrom.x, pFrom.y);
+        ctx.quadraticCurveTo(midX, midY, pTo.x, pTo.y);
+      };
+
+      // Handle Tripped / Failed Line
+      if (isTrippedLine) {
+        ctx.save();
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2.2;
+        ctx.setLineDash([6, 10]);
+        tracePath();
+        ctx.stroke();
+        ctx.restore();
+        return;
+      }
+
+      // 2 & 3. Dynamic Color States & Animation Speed Mapping
+      let bloomColor = '#00F0FF';    // Safe Neon Cyan
+      let conductorColor = '#00B4D8';// Deep Electric Cyan
+      let pulseSpeed = 1.0;           // Smooth steady flow
+
+      if (stressRatio > 0.92) {
+        bloomColor = '#FF1A4D';      // High-Voltage Crimson
+        conductorColor = '#FF3300';  // Vivid Hot Red
+        pulseSpeed = 3.5;            // Rapid jittery surge
+      } else if (stressRatio >= 0.75) {
+        bloomColor = '#FFAA00';      // Warning Amber
+        conductorColor = '#FF8800';  // Warm Gold
+        pulseSpeed = 2.0;            // Accelerated flow
+      }
+
+      // Thermal Flashing (5 Hz Flicker at critical overload >92%)
+      let bloomOpacity = 0.45;
+      if (stressRatio > 0.92) {
+        const flicker = 0.35 + 0.65 * Math.abs(Math.sin(Date.now() * 0.0314)); // 5Hz sine flicker
+        bloomOpacity *= flicker;
+      }
+
+      // --- Layer 1: Ambient Bloom (Base) ---
+      ctx.save();
+      ctx.globalAlpha = bloomOpacity;
+      ctx.strokeStyle = bloomColor;
+      ctx.lineWidth = 14;
+      ctx.shadowColor = bloomColor;
+      ctx.shadowBlur = 14;
+      tracePath();
+      ctx.stroke();
+      ctx.restore();
+
+      // --- Layer 2: Energy Conductor (Middle) ---
+      ctx.save();
+      ctx.globalAlpha = 1.0;
+      ctx.strokeStyle = conductorColor;
+      ctx.lineWidth = 4.0;
+      ctx.shadowBlur = 0;
+      tracePath();
+      ctx.stroke();
+      ctx.restore();
+
+      // --- Layer 3: Superconducting Core (Top) ---
+      ctx.save();
+      ctx.globalAlpha = 1.0;
+      ctx.strokeStyle = '#ffffff'; // Pure White
+      ctx.lineWidth = 1.4;
+      ctx.shadowBlur = 0;
+      tracePath();
+      ctx.stroke();
+      ctx.restore();
+
+      // --- 4. Animated Flow Marker (Current Pulses) ---
+      ctx.save();
+      ctx.globalAlpha = 0.95;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2.2;
+      ctx.setLineDash([8, 32]);
+      ctx.lineDashOffset = -animOffset * pulseSpeed;
+      tracePath();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Animation Loop
+    function render() {
+      ctx.clearRect(0, 0, width, height);
+
+      // Dark Grid Map Overlay Lines (Matching Screenshot Map background grid)
+      ctx.strokeStyle = 'rgba(26, 36, 54, 0.4)';
+      ctx.lineWidth = 1;
+      for (let x = -350; x <= 350; x += 70) {
+        const start = toScreen(x, -350, 0);
+        const end = toScreen(x, 350, 0);
+        ctx.beginPath(); ctx.moveTo(start.x, start.y); ctx.lineTo(end.x, end.y); ctx.stroke();
+      }
+      for (let y = -350; y <= 350; y += 70) {
+        const start = toScreen(-350, y, 0);
+        const end = toScreen(350, y, 0);
+        ctx.beginPath(); ctx.moveTo(start.x, start.y); ctx.lineTo(end.x, end.y); ctx.stroke();
+      }
+
+      // Procedural Infrastructure / Buildings
+      drawIsometricBlock(-80, -50, 45, 55, 50, '#0d131f', '#172234');
+      drawIsometricBlock(40, -90, 55, 35, 65, '#0a0f18', '#141d2d');
+      drawIsometricBlock(-30, 50, 65, 45, 40, '#090d15', '#121927');
+
+      // Substations
+      substations.forEach(sub => {
+        const stress = sub.currentMW / sub.maxMW;
+        let roofColor = '#172436';
+        let glow = null;
+
+        if (stress >= 1.0) {
+          roofColor = '#50121a';
+          glow = '#ef4444';
+        } else if (stress >= 0.88) {
+          roofColor = '#47320c';
+          glow = '#fbbf24';
+        } else {
+          glow = '#00e5ff';
+        }
+
+        drawIsometricBlock(sub.isoX, sub.isoY, 38, 38, 22, '#0f1724', roofColor, glow);
+      });
+
+      // Energized High Voltage Lines
+      powerlines.forEach(line => {
+        const subA = substations[line.from];
+        const subB = substations[line.to];
+        const p1 = toScreen(subA.isoX + 19, subA.isoY + 19, 22);
+        const p2 = toScreen(subB.isoX + 19, subB.isoY + 19, 22);
+        const stress = Math.max(subA.currentMW / subA.maxMW, subB.currentMW / subB.maxMW);
+        
+        const isTripped = (isLineTripped && ((line.from === 0 && line.to === 2) || (line.from === 2 && line.to === 0)));
+        drawNeonLine(p1, p2, line.color, stress, isTripped);
+      });
+
+      // Update Substation HUD Positions
+      substations.forEach((sub, i) => {
+        const p = toScreen(sub.isoX + 19, sub.isoY + 19, 28);
+        const hud = document.getElementById(`hudSub${i}`);
+        hud.style.left = `${p.x}px`;
+        hud.style.top = `${p.y}px`;
+      });
+
+      animOffset += 1.0;
+      requestAnimationFrame(render);
+    }
+    render();
+
+    // Simulation Engine & State Controls
+    const sliderTemp = document.getElementById('sliderTemp');
+    const sliderCloud = document.getElementById('sliderCloud');
+    const valTemp = document.getElementById('valTemp');
+    const valCloud = document.getElementById('valCloud');
+    const totalDemandEl = document.getElementById('totalDemand');
+    const gridStatusPill = document.getElementById('gridStatusPill');
+    const gridStatusText = document.getElementById('gridStatusText');
+    const aiRecommendation = document.getElementById('aiRecommendation');
+    const logBox = document.getElementById('logBox');
+
+    function updateSimulation() {
+      const dt = parseFloat(sliderTemp.value);
+      const cloud = parseFloat(sliderCloud.value);
+
+      valTemp.innerText = `+${dt.toFixed(1)} °C`;
+      valCloud.innerText = `${cloud}%`;
+
+      const heatwaveSurge = dt * 260; // MW surge per degree C
+      const solarDropSurge = (cloud / 100) * 420; // MW loss replaceable by grid
+
+      let netTotal = 0;
+      let criticalOverload = false;
+      let warningState = false;
+
+      // Update Solar generation telemetry
+      const solarGen = Math.max(0, Math.round(1240 * (1 - cloud / 100)));
+      document.getElementById('statSolar').innerText = `${solarGen} MW`;
+
+      substations.forEach((sub, i) => {
+        let load = sub.baseMW + (heatwaveSurge * 0.25) + (solarDropSurge * 0.25);
+        
+        if (isT3Tripped && i === 1) {
+          sub.maxMW = 1850; // Dropped capacity on trip
+        } else if (!isT3Tripped && i === 1) {
+          sub.maxMW = 2300;
+        }
+
+        sub.currentMW = Math.round(load);
+        netTotal += sub.currentMW;
+
+        const statEl = document.getElementById(`statSub${i}`);
+        const hudEl = document.getElementById(`hudSub${i}`);
+        const barEl = document.getElementById(`barSub${i}`);
+        
+        statEl.innerText = `${sub.currentMW.toLocaleString()} / ${sub.maxMW.toLocaleString()} MW`;
+        const pct = Math.min(100, Math.round((sub.currentMW / sub.maxMW) * 100));
+        barEl.style.width = `${pct}%`;
+
+        if (pct >= 100) {
+          hudEl.className = "hud-card critical";
+          barEl.style.backgroundColor = "var(--coal-red)";
+          criticalOverload = true;
+        } else if (pct >= 88) {
+          hudEl.className = "hud-card warning";
+          barEl.style.backgroundColor = "var(--solar-yellow)";
+          warningState = true;
+        } else {
+          hudEl.className = "hud-card";
+          barEl.style.backgroundColor = "var(--color-500kv)";
+        }
+      });
+
+      totalDemandEl.innerText = `${netTotal.toLocaleString()} MW`;
+
+      if (criticalOverload) {
+        gridStatusPill.className = "telemetry-pill alert";
+        gridStatusText.innerText = "CRITICAL OVERLOAD";
+        aiRecommendation.innerText = "CRITICAL: Feeder capacity ceiling breached! Initiate Linear Program load-rebalancing immediately.";
+      } else if (warningState) {
+        gridStatusPill.className = "telemetry-pill";
+        gridStatusPill.style.borderColor = "var(--solar-yellow)";
+        gridStatusPill.style.color = "var(--solar-yellow)";
+        gridStatusText.innerText = "THERMAL STRESS WARNING";
+        aiRecommendation.innerText = "WARNING: Okhla/South corridor thermal headroom <12%. Rerouting recommended.";
+      } else {
+        gridStatusPill.className = "telemetry-pill";
+        gridStatusPill.style.borderColor = "";
+        gridStatusPill.style.color = "";
+        gridStatusText.innerText = "GRID NOMINAL";
+        aiRecommendation.innerText = "System operating within safe thermal ratings. All interties nominal.";
+      }
+    }
+
+    sliderTemp.addEventListener('input', updateSimulation);
+    sliderCloud.addEventListener('input', updateSimulation);
+
+    function toggleTrip(subId) {
+      isT3Tripped = !isT3Tripped;
+      const btn = document.getElementById('btnTripT3');
+      btn.className = isT3Tripped ? "btn-contingency active" : "btn-contingency";
+      btn.querySelector('span:last-child').innerText = isT3Tripped ? "[TRIPPED]" : "[OFF]";
+      addLog(isT3Tripped ? "ALERT: Transformer 03 (Okhla) tripped! Available capacity reduced to 1,850 MW." : "RECOVERY: Transformer 03 resynchronized to 220kV bus.", isT3Tripped ? "danger" : "success");
+      updateSimulation();
+    }
+
+    function toggleLineTrip() {
+      isLineTripped = !isLineTripped;
+      const btn = document.getElementById('btnTripLine');
+      btn.className = isLineTripped ? "btn-contingency active" : "btn-contingency";
+      btn.querySelector('span:last-child').innerText = isLineTripped ? "[TRIPPED]" : "[OFF]";
+      addLog(isLineTripped ? "ALERT: Bawana-Ghazipur 400kV line tripped! Loop flow diverted to 220kV tie-lines." : "RECOVERY: Bawana-Ghazipur 400kV line re-energized.", isLineTripped ? "danger" : "success");
+      updateSimulation();
+    }
+
+    function addLog(msg, type = "normal") {
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      const time = new Date().toTimeString().split(' ')[0];
+      entry.innerText = `[${time}] ${msg}`;
+      logBox.prepend(entry);
+    }
+
+    function triggerOptimization() {
+      addLog("PuLP Simplex LP Solver invoked for Constrained OPF minimization.", "warn");
+      
+      // Autonomous optimization load shift: offload Okhla to Bawana & Ghazipur
+      substations[1].baseMW -= 160;
+      substations[0].baseMW += 90;
+      substations[2].baseMW += 70;
+      
+      setTimeout(() => {
+        addLog("OPF Reroute Executed: Offloaded 160 MW from Okhla onto Bawana 400kV & Ghazipur tie-lines.", "success");
+        aiRecommendation.innerText = "Reroute Complete: Linear Programming solution converged. Thermal headroom restored across all 4 hubs.";
+        updateSimulation();
+      }, 500);
+    }
+
+    updateSimulation();
+  </script>
+</body>
+</html>

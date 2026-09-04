@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AURA | Delhi Grid Digital Twin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- the map owns the screen; every panel floats over it -->
+  <div id="map"></div>
+
+  <aside class="panel" id="panel">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2">
+        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+      </svg>
+      <div class="brand-text">
+        <b>AURA</b>
+        <small>Delhi SLDC · digital twin</small>
+      </div>
+      <div class="telemetry-pill" id="statusPill"><i class="indicator-dot"></i><span id="statusText">NOMINAL</span></div>
+    </div>
+
+    <section class="block">
+      <div class="section-title">AI Demand Forecast <span class="mono dim" id="forecastNow">—</span></div>
+      <svg id="chart" viewBox="0 0 268 92" preserveAspectRatio="none"></svg>
+      <div class="chart-key">
+        <span><i class="k actual"></i>actual</span>
+        <span><i class="k pred"></i>LightGBM +12h</span>
+        <span class="mono dim" id="chartPeak"></span>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="section-title">Grid State <span class="mono dim" id="tickLabel">tick 0</span></div>
+      <div class="stats">
+        <div><label>Served</label><b class="mono" id="mServed">—</b></div>
+        <div><label>Shed</label><b class="mono warn" id="mShed">—</b></div>
+        <div><label>Peak circuit</label><b class="mono" id="mPeak">—</b></div>
+        <div><label>At risk</label><b class="mono" id="mRisk">—</b></div>
+        <div><label>Failed</label><b class="mono" id="mFailed">—</b></div>
+        <div><label>Switched</label><b class="mono" id="mSwitched">—</b></div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="section-title">Load Balancing</div>
+      <button class="btn primary" id="btnTick">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        Advance forecast · rebalance
+      </button>
+      <div class="slider-row">
+        <label>Temperature</label>
+        <input type="range" id="temp" min="1" max="12" step="1" value="6">
+        <output class="mono" id="tempOut">+6°C</output>
+        <button class="btn tiny" id="btnTemp">apply</button>
+      </div>
+      <div class="slider-row">
+        <label>Demand</label>
+        <input type="range" id="dem" min="5" max="40" step="5" value="10">
+        <output class="mono" id="demOut">+10%</output>
+        <button class="btn tiny" id="btnDemand">apply</button>
+      </div>
+      <div class="fail-hint">Click any corridor on the map to trip it</div>
+    </section>
+
+    <section class="block ai">
+      <div class="section-title">AI Redistribution Agent</div>
+      <div class="ai-box"><span id="aiText">Grid calibrated. Awaiting forecast tick.</span></div>
+      <button class="btn ghost" id="btnReset">Reset grid</button>
+    </section>
+  </aside>
+
+  <!-- minimal floating activity feed: only critical events -->
+  <div class="feed" id="feed"></div>
+
+  <div class="toolrail">
+    <button class="tool-btn" id="btnRecenter" title="Recenter on Delhi">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+    </button>
+    <button class="tool-btn" id="btnPitch" title="Toggle 3D">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></svg>
+    </button>
+    <button class="tool-btn active" id="btnLabels" title="Toggle labels">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h7"/></svg>
+    </button>
+    <button class="tool-btn active" id="btnFuture" title="Toggle planned corridors">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3" viewBox="0 0 24 24"><path d="M3 18L21 6"/></svg>
+    </button>
+  </div>
+
+  <div class="legend" id="legend">
+    <span><i class="v" style="background:#ffffff"></i>765 kV</span>
+    <span><i class="v" style="background:#00e5ff"></i>400 kV</span>
+    <span><i class="v" style="background:#3b82f6"></i>220 kV</span>
+    <span class="gap"></span>
+    <span><i class="v" style="background:#22c55e"></i>&lt;60%</span>
+    <span><i class="v" style="background:#eab308"></i>85%</span>
+    <span><i class="v" style="background:#ef4444"></i>&gt;95%</span>
+    <span><i class="v dashed"></i>failed</span>
+  </div>
+
+  <div class="busy hidden" id="busy"><i class="spin"></i>optimizing dispatch…</div>
+
+  <script src="chart.js"></script>
+  <script src="map.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
