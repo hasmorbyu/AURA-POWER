@@ -1,3 +1,8 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }]
+  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }],
+  "functions": {
+    "api/index.py": {
+      "includeFiles": "{grid/frontend/**,data/hourly_features.csv,data/delhi_power_transmission_lines.csv,models/lgbm_demand_model.txt}"
+    }
+  }
 }
