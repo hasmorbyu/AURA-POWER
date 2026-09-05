@@ -16,11 +16,33 @@ import lightgbm as lgb
 import numpy as np
 import pandas as pd
 
-from scripts.forecast import (
-    TARGET_CALENDAR_COLS,
-    TARGET_EVENT_COLS,
-    TARGET_WEATHER_COLS,
-)
+# Feature names must match the trained LightGBM model.  They live here rather
+# than in the offline reporting script so the web runtime has no plotting
+# dependency.
+TARGET_WEATHER_COLS = {
+    "temperature_2m (°C)": "target_temperature",
+    "relative_humidity_2m (%)": "target_humidity",
+    "apparent_temperature (°C)": "target_apparent_temp",
+    "wind_speed_10m (km/h)": "target_wind",
+    "cloud_cover (%)": "target_cloud_cover",
+    "rain (mm)": "target_rain",
+    "precipitation (mm)": "target_precipitation",
+    "is_day ()": "target_is_day",
+    "shortwave_radiation (W/m²)": "target_radiation",
+}
+TARGET_EVENT_COLS = {
+    "event_intensity": "target_event_intensity",
+    "event_active": "target_event_active",
+    "hours_to_event": "target_hours_to_event",
+    "hours_since_event": "target_hours_since_event",
+    "expected_attendance": "target_expected_attendance",
+}
+TARGET_CALENDAR_COLS = {
+    "day_of_week": "target_day_of_week",
+    "is_weekend": "target_is_weekend",
+    "is_holiday": "target_is_holiday",
+    "is_school_break": "target_is_school_break",
+}
 
 REPO = Path(__file__).resolve().parent.parent
 MODEL_PATH = REPO / "models" / "lgbm_demand_model.txt"
