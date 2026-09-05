@@ -36,13 +36,6 @@ temp/
 
 # Generated training data and analysis artifacts (not needed by the deployed app)
 data/training_table.parquet
-data/demand_5min.csv
-data/weather_hourly.csv
-data/demand_weather.csv
-data/delhi_events.csv
-data/final_dataset.csv
-data/test_predictions.parquet
-reports/
 
 __pycache__/
 *.py[cod]
@@ -50,5 +43,4 @@ __pycache__/
 node_modules/
 .env
 
-data/training_table.parquet
 data/training_table.parquet
