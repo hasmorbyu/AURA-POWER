@@ -51,3 +51,4 @@ node_modules/
 .env
 
 data/training_table.parquet
+data/training_table.parquet
