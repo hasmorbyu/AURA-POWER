@@ -8,7 +8,7 @@ currently is.
 import pandas as pd
 
 from grid import demand as demand_mod
-from grid.core import Solution, optimize_with_switching
+from grid.core import Solution, naive_dispatch, optimize_with_switching
 from grid.electrical import validate
 from grid.state import SOFT_ALARM_THRESHOLD, GridState
 
@@ -16,17 +16,25 @@ MAX_ATTEMPTS = 4
 DERATE_SAFETY = 0.95
 
 
-def run_intervention(state: GridState, trigger: dict) -> dict:
+def run_intervention(state: GridState, trigger: dict, commit: bool = True) -> dict:
     """Optimize, validate through power flow, retry on violations, then apply.
 
     Each candidate rejected by power flow is recorded with the assets that
     failed it, and those lines are derated so the next solve routes around
     them. Only a validated dispatch is ever written back to the state.
+
+    `commit=False` runs the real LP solve and real pandapower validation --
+    nothing about the computation is skipped -- but restores every field it
+    touched before returning, so a speculative "what would AURA do right now"
+    preview can never leave a side effect on the shared GridState.
     """
     util_before = state.corridor_utilisation()
     risk_before = state.risk()
     served_before = dict(state.served_mw)
     flows_before = dict(state.flows_mw)
+    injections_before = dict(state.injections_mw)
+    switched_before = set(state.switched_out)
+    tick_before = state.tick
 
     derate: dict[int, float] = {}
     rejected: list[dict] = []
@@ -85,6 +93,8 @@ def run_intervention(state: GridState, trigger: dict) -> dict:
     state.injections_mw = dict(accepted.injections_mw)
     state.served_mw = dict(accepted.served_mw)
     state.tick += 1
+    # switched_out already reflects `accepted_switches` from the loop above,
+    # whether or not we end up committing -- reverted below if commit=False
     switch_actions = [
         {
             "kind": "switch_out",
@@ -103,12 +113,20 @@ def run_intervention(state: GridState, trigger: dict) -> dict:
         if validated else
         "Applied best available dispatch; power flow still reports overloads."
     )
-    return _result(
+    result = _result(
         state, trigger, accepted=True, actions=actions, rejected=rejected,
         util_before=util_before, risk_before=risk_before,
         served_before=served_before, flows_before=flows_before,
         solution=accepted, validation=validation, message=message,
     )
+    if not commit:
+        # real solve, real validation, but a preview must leave no trace
+        state.flows_mw = flows_before
+        state.injections_mw = injections_before
+        state.served_mw = served_before
+        state.switched_out = switched_before
+        state.tick = tick_before
+    return result
 
 
 def _build_actions(state, solution, flows_before, served_before) -> list[dict]:
@@ -274,9 +292,9 @@ def tick(state: GridState, as_of: pd.Timestamp, horizon_h: int = 2) -> dict:
     return run_intervention(state, trigger)
 
 
-# --- Case 2: judge-driven disturbance ---------------------------------------
+# --- Case 2: judge-driven stress, and AURA's separate, manual response -----
 
-def disturbance(
+def _apply_disturbance_mutation(
     state: GridState,
     kind: str,
     *,
@@ -286,7 +304,7 @@ def disturbance(
     line_gids: list[int] | None = None,
     as_of: pd.Timestamp | None = None,
 ) -> dict:
-    """Apply a judge's disturbance to the running state and re-optimize."""
+    """Mutate demand/failures only -- no redispatch, no optimizer. Returns the trigger."""
     trigger: dict = {"type": kind}
 
     if kind == "temperature":
@@ -326,4 +344,72 @@ def disturbance(
     else:
         raise ValueError(f"unknown disturbance kind: {kind}")
 
-    return run_intervention(state, trigger)
+    return trigger
+
+
+def apply_stress(
+    state: GridState,
+    kind: str,
+    *,
+    temperature_delta_c: float | None = None,
+    demand_multiplier: float | None = None,
+    corridor: str | None = None,
+    line_gids: list[int] | None = None,
+    as_of: pd.Timestamp | None = None,
+) -> dict:
+    """Apply a judge's stress event and show its raw, unmanaged consequence.
+
+    Deliberately does NOT call the optimizer. This is the "before AURA" half
+    of the demo: real demand/failure mutation, then a real PTDF flow
+    recalculation (`naive_dispatch`) showing what the network does with no
+    smart redispatch -- including genuine overloads, if the stress is severe
+    enough to cause them. AURA only responds when `optimize_now` is called
+    separately.
+    """
+    util_before = state.corridor_utilisation()
+    risk_before = state.risk()
+    served_before = dict(state.served_mw)
+    flows_before = dict(state.flows_mw)
+
+    trigger = _apply_disturbance_mutation(
+        state, kind,
+        temperature_delta_c=temperature_delta_c, demand_multiplier=demand_multiplier,
+        corridor=corridor, line_gids=line_gids, as_of=as_of,
+    )
+
+    solution = naive_dispatch(state)
+    state.flows_mw = dict(solution.flows_mw)
+    state.injections_mw = dict(solution.injections_mw)
+    state.served_mw = dict(solution.served_mw)
+    state.tick += 1
+
+    return _result(
+        state, trigger, accepted=True, actions=[], rejected=[],
+        util_before=util_before, risk_before=risk_before,
+        served_before=served_before, flows_before=flows_before,
+        solution=solution, validation=None,
+        message="Stress applied; this is the unmanaged grid response. AURA has not intervened.",
+    )
+
+
+def disturbance(state: GridState, kind: str, **kwargs) -> dict:
+    """Backwards-compatible alias for `apply_stress` -- kept as the public
+    entry point `/api/disturbance` calls; the naive-dispatch behavior above
+    *is* the intended semantics, not a fallback."""
+    return apply_stress(state, kind, **kwargs)
+
+
+def optimize_now(state: GridState) -> dict:
+    """The judge's explicit [ AURA REBALANCE ] action: run AURA's real
+    optimizer against whatever state currently exists, commit the result."""
+    return run_intervention(state, trigger={"type": "manual_optimize"})
+
+
+def preview_intervention(state: GridState) -> dict:
+    """What AURA *would* do right now, without touching the shared state.
+
+    Runs the real LP and real pandapower validation (see `run_intervention`'s
+    `commit` parameter) so the optimizer panel can honestly show "AURA can
+    redistribute N MW" before the judge clicks anything.
+    """
+    return run_intervention(state, trigger={"type": "preview"}, commit=False)

@@ -8,6 +8,20 @@ from dataclasses import dataclass, field
 from grid.data import GridNetwork, load_network
 
 SOFT_ALARM_THRESHOLD = 0.90  # corridor loading fraction that counts as "at risk"
+OVERLOAD_THRESHOLD = 1.00    # corridor loading fraction that counts as genuinely overloaded
+
+# Finer-grained bands for the map's colour scale and legend -- consistent with
+# (but more granular than) SOFT_ALARM_THRESHOLD/OVERLOAD_THRESHOLD above, which
+# drive the coarser corridors_at_risk/overloaded_corridors counts. One table,
+# served to the frontend via /api/config, so the map/legend/alerts panel never
+# hardcode a cutoff that could drift from what the backend actually means by it.
+LOADING_BANDS = [
+    {"key": "safe", "label": "Safe", "max": 0.70, "color": "#2dd4a8"},
+    {"key": "elevated", "label": "Elevated", "max": 0.85, "color": "#eab308"},
+    {"key": "high", "label": "High", "max": 1.00, "color": "#f97316"},
+    {"key": "overloaded", "label": "Overloaded", "max": 1.10, "color": "#ef4444"},
+    {"key": "critical", "label": "Critical", "max": None, "color": "#ff1a4d"},
+]
 
 
 @dataclass
@@ -61,6 +75,7 @@ class GridState:
         for (a, b), gids in self.network.corridors.items():
             cap = 0.0
             flow = 0.0
+            net_signed = 0.0  # positive = net flow from a to b
             live = 0
             worst = 0.0
             kv = 0.0
@@ -71,13 +86,17 @@ class GridState:
                 if gid in self.failed_lines or gid in self.switched_out:
                     continue
                 line_cap = float(row["capacity_mw"])
-                line_flow = abs(self.flows_mw.get(gid, 0.0))
+                raw_flow = self.flows_mw.get(gid, 0.0)  # + = row.from_sub -> row.to_sub
+                line_flow = abs(raw_flow)
                 cap += line_cap
                 flow += line_flow
                 live += 1
                 if line_cap > 0:
                     worst = max(worst, line_flow / line_cap)
                 kv = max(kv, float(row["voltage_kv"]))
+                # corridor's (a, b) is alphabetical, not necessarily this row's
+                # own from/to order, so flip the sign when the row runs b -> a
+                net_signed += raw_flow if row["from_sub"] == a else -raw_flow
             key = f"{a}|{b}"
             out[key] = {
                 "from": a,
@@ -89,6 +108,7 @@ class GridState:
                 # the corridor average -- a saturated 250 MW line inside a 5 GW
                 # corridor is what actually strands load.
                 "max_circuit_loading": round(worst, 4),
+                "flow_direction": 1 if net_signed >= 0 else -1,
                 "voltage_kv": kv,
                 "circuits_live": live,
                 "circuits_total": len(gids),
@@ -100,6 +120,7 @@ class GridState:
         loadings = [c["loading"] for c in util.values() if c["capacity_mw"] > 0]
         circuit_loadings = [c["max_circuit_loading"] for c in util.values() if c["capacity_mw"] > 0]
         at_risk = [k for k, c in util.items() if c["max_circuit_loading"] >= SOFT_ALARM_THRESHOLD]
+        overloaded = [k for k, c in util.items() if c["max_circuit_loading"] >= OVERLOAD_THRESHOLD]
         at_limit = sum(
             1 for row in self.available_lines()
             if float(row.capacity_mw) > 0
@@ -107,12 +128,24 @@ class GridState:
         )
         total_demand = sum(self.demand_mw.values())
         total_served = sum(self.served_mw.values())
+
+        # a substation is "stressed" if it sits on either end of an at-risk
+        # or overloaded corridor -- derived from existing topology, no new data
+        stressed_keys = set(at_risk)
+        stressed_subs = {
+            sub for key in stressed_keys for sub in key.split("|")
+        }
+
         return {
             "max_corridor_loading": round(max(loadings), 4) if loadings else 0.0,
             "max_circuit_loading": round(max(circuit_loadings), 4) if circuit_loadings else 0.0,
             "circuits_at_limit": at_limit,
             "corridors_at_risk": len(at_risk),
             "at_risk_corridors": sorted(at_risk),
+            "overloaded_corridors": len(overloaded),
+            "overloaded_corridor_keys": sorted(overloaded),
+            "stressed_substations": len(stressed_subs),
+            "stressed_substation_names": sorted(stressed_subs),
             "total_demand_mw": round(total_demand, 1),
             "total_served_mw": round(total_served, 1),
             "total_shed_mw": round(total_demand - total_served, 1),

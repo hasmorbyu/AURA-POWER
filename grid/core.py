@@ -176,6 +176,89 @@ def optimize(state: GridState, capacity_derate: dict[int, float] | None = None) 
     )
 
 
+def naive_dispatch(state: GridState) -> Solution:
+    """What the grid physically does if nobody redispatches anything.
+
+    Used to show the *unmanaged* consequence of a stress event -- generation
+    ramps proportionally to meet the new demand (each source keeps its current
+    share of total output, capped at its own headroom), nothing is optimized,
+    and flows follow from those injections through the same PTDF matrix
+    `optimize()` uses. This is a real physical calculation, not a placeholder:
+    any overload it reveals is genuine, which is what makes "AURA has not
+    intervened yet" a meaningful state to show a judge.
+    """
+    topo = build_topology(state)
+    if not topo.line_branch_rows:
+        return Solution(feasible=False, status="no lines in service")
+    _, slack_bus = pick_slack(state, topo)
+    ptdf = compute_ptdf(topo, slack_bus)
+
+    nodes = sorted(state.network.substations)
+    total_demand = sum(state.demand_mw.get(n, 0.0) for n in nodes)
+    total_prior_output = sum(state.injections_mw.get(n, 0.0) for n in nodes)
+
+    inject_out: dict[str, float] = {}
+    for name in nodes:
+        cap = state.supply_cap_mw.get(name, 0.0)
+        prior = state.injections_mw.get(name, 0.0)
+        share = prior / total_prior_output if total_prior_output > 1e-6 else 1.0 / max(len(nodes), 1)
+        inject_out[name] = min(cap, share * total_demand)
+
+    # If proportional scaling under-generates (headroom exhausted), let every
+    # source ramp further, still capped -- a second pass rather than shedding,
+    # since "unmanaged" means the grid tries to meet demand, not gives up on it.
+    shortfall = total_demand - sum(inject_out.values())
+    if shortfall > 1e-6:
+        headroom = {n: max(0.0, state.supply_cap_mw.get(n, 0.0) - inject_out[n]) for n in nodes}
+        total_headroom = sum(headroom.values())
+        if total_headroom > 1e-6:
+            for name in nodes:
+                inject_out[name] += shortfall * headroom[name] / total_headroom
+
+    total_output = sum(inject_out.values())
+    served_out = {
+        n: state.demand_mw.get(n, 0.0) * min(1.0, total_output / total_demand) if total_demand > 1e-6 else 0.0
+        for n in nodes
+    }
+    shed_out = {
+        n: round(state.demand_mw.get(n, 0.0) - served_out[n], 3)
+        for n in nodes
+        if state.demand_mw.get(n, 0.0) - served_out[n] > 0.1
+    }
+
+    bus_vec = np.zeros(len(topo.buses))
+    for name in nodes:
+        if name in topo.gen_bus:
+            bus_vec[topo.gen_bus[name]] += inject_out[name]
+        if name in topo.load_bus:
+            bus_vec[topo.load_bus[name]] -= served_out[name]
+    flows = {
+        topo.branches[k]["gid"]: float(ptdf[k] @ bus_vec)
+        for k in topo.line_branch_rows
+    }
+
+    loss_coeff = {
+        topo.branches[k]["gid"]: (
+            topo.branches[k]["r_ohm_per_km"] * topo.branches[k]["length_km"]
+            / (topo.branches[k]["kv"] ** 2) * 1000.0
+        )
+        for k in topo.line_branch_rows
+    }
+    est_loss = sum(loss_coeff[g] * abs(f) for g, f in flows.items())
+
+    return Solution(
+        feasible=True,
+        flows_mw=flows,
+        injections_mw=inject_out,
+        served_mw=served_out,
+        shed_mw=shed_out,
+        switched=[],
+        objective=0.0,
+        estimated_loss_mw=round(est_loss, 2),
+        status="naive",
+    )
+
+
 def _relief_candidates(state: GridState, solution: Solution, limit: int = 3) -> list[int]:
     """Lines running at their limit that could be opened without isolating a corridor.
 

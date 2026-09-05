@@ -6,7 +6,7 @@ import json
 
 import pandas as pd
 
-from grid.scenarios import bootstrap_state, disturbance, tick
+from grid.scenarios import bootstrap_state, disturbance, optimize_now, preview_intervention, tick
 
 RULE = "=" * 78
 
@@ -73,23 +73,33 @@ def main() -> None:
     print()
     print(RULE)
     print("CASE 2 -- JUDGE-DRIVEN GRID FAILURE (state carries over, never resets)")
+    print("Two-phase: a stress event shows the raw, UNMANAGED consequence (no AI")
+    print("involved); AURA only responds when optimize_now() is called separately.")
     print(RULE)
 
     show(disturbance(state, "temperature", temperature_delta_c=6.0,
                      as_of=pd.Timestamp("2025-06-15 12:00:00")),
-         "judge raises temperature +6 C (through the real forecast model)")
+         "UNMANAGED: judge raises temperature +6 C (through the real forecast model)")
 
     show(disturbance(state, "demand", demand_multiplier=1.10),
-         "judge raises demand +10%")
+         "UNMANAGED: judge raises demand +10%")
+
+    preview = preview_intervention(state)
+    print(f"\n--- AURA PREVIEW (no commit) --- would reroute {preview['mw_rerouted']:.1f} MW"
+          f" through {len(preview['actions'])} actions")
+
+    show(optimize_now(state), "AURA REBALANCE: judge clicks it, AURA responds to the stress above")
 
     show(disturbance(state, "line_failure", corridor="Pusa|Lodhi Road"),
-         "judge fails the Pusa <-> Lodhi Road corridor")
+         "UNMANAGED: judge fails the Pusa <-> Lodhi Road corridor")
 
     show(disturbance(state, "line_failure", corridor="Mundka|Pusa"),
-         "judge fails Mundka <-> Pusa as well")
+         "UNMANAGED: judge fails Mundka <-> Pusa as well")
 
     show(disturbance(state, "line_failure", corridor="Najafgarh|Pusa"),
-         "judge fails Najafgarh <-> Pusa -- cascading stress")
+         "UNMANAGED: judge fails Najafgarh <-> Pusa -- cascading stress")
+
+    show(optimize_now(state), "AURA REBALANCE: judge clicks it again after the cascading failures")
 
     print()
     print(RULE)

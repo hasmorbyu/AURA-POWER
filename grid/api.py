@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from grid import demand as demand_mod
 from grid import scenarios
 from grid.schemas import DisturbanceRequest, NetworkState, TickRequest
-from grid.state import GridState
+from grid.state import LOADING_BANDS, OVERLOAD_THRESHOLD, SOFT_ALARM_THRESHOLD, GridState
 
 app = FastAPI(title="AURA grid optimizer", version="1.0")
 
@@ -60,12 +60,23 @@ def _network_state(state: GridState) -> dict:
         if f"{a}|{b}" not in live_keys
     ]
 
+    risk = state.risk()
+    if risk["overloaded_corridors"] > 0:
+        phase = "overload"
+    elif risk["corridors_at_risk"] > 0:
+        phase = "at_risk"
+    elif risk["total_shed_mw"] > 0.1:
+        phase = "shedding"
+    else:
+        phase = "stable"
+
     return {
         "tick": state.tick,
         "substations": substations,
         "corridors": {k: v for k, v in corridors.items() if k in live_keys},
         "future_corridors": future,
-        "risk": state.risk(),
+        "risk": risk,
+        "phase": phase,
         "demand_scale": round(state.demand_scale, 4),
         "temperature_c": state.temperature_c,
     }
@@ -98,10 +109,16 @@ def post_tick(req: TickRequest):
 
 @app.post("/api/disturbance")
 def post_disturbance(req: DisturbanceRequest):
-    """Case 2: a judge raises temperature/demand or fails a corridor."""
+    """Case 2, phase 1: a judge raises temperature/demand or fails a corridor.
+
+    Deliberately does NOT run the optimizer -- this returns the raw, unmanaged
+    physical consequence (real PTDF recalculation, genuine overloads if the
+    stress is severe enough). AURA only responds when the judge separately
+    calls POST /api/optimize.
+    """
     state = get_state()
     try:
-        result = scenarios.disturbance(
+        result = scenarios.apply_stress(
             state, req.kind,
             temperature_delta_c=req.temperature_delta_c,
             demand_multiplier=req.demand_multiplier,
@@ -115,16 +132,42 @@ def post_disturbance(req: DisturbanceRequest):
     return result
 
 
+@app.post("/api/optimize")
+def post_optimize():
+    """Case 2, phase 2: the judge's explicit [ AURA REBALANCE ]. Runs the real
+    optimizer against whatever state currently exists and commits the result."""
+    state = get_state()
+    result = scenarios.optimize_now(state)
+    _history.append(result)
+    return result
+
+
+@app.get("/api/optimize/preview")
+def read_optimize_preview():
+    """What AURA would do right now, without committing it -- powers the
+    optimizer panel's "AURA CAN: redistribute N MW" line before the judge
+    clicks anything. Real LP solve, real validation, zero side effects."""
+    return scenarios.preview_intervention(get_state())
+
+
 @app.get("/api/config")
 def read_config():
-    """Tells the frontend which map library to load.
+    """Tells the frontend which map library to load, and the loading
+    thresholds that already govern the backend's own risk calculations, so
+    the map/legend/alerts never hardcode a cutoff that could drift from it.
 
     Mapbox GL JS renders nothing without a token, so when MAPBOX_TOKEN is unset
     the client falls back to MapLibre GL JS (API-identical) with a free dark
     basemap. Setting the env var switches it to real Mapbox with no code change.
     """
     token = os.environ.get("MAPBOX_TOKEN", "").strip()
-    return {"mapbox_token": token, "engine": "mapbox" if token else "maplibre"}
+    return {
+        "mapbox_token": token,
+        "engine": "mapbox" if token else "maplibre",
+        "at_risk_threshold": SOFT_ALARM_THRESHOLD,
+        "overload_threshold": OVERLOAD_THRESHOLD,
+        "loading_bands": LOADING_BANDS,
+    }
 
 
 @app.get("/api/forecast")

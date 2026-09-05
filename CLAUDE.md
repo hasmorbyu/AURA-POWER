@@ -78,8 +78,8 @@ uvicorn grid.api:app --host 127.0.0.1 --port 8000     # UI at http://127.0.0.1:8
 | `demand.py` | citywide LightGBM forecast → per-substation demand; temperature lever |
 | `state.py` | `GridState`: mutable loads/outages/flows, carried across interventions |
 | `core.py` | the DC-OPF (PuLP) + greedy switching relief — one core, both scenarios |
-| `scenarios.py` | `tick()` (Case 1 forecast) and `disturbance()` (Case 2 judge), shared loop |
-| `api.py` | FastAPI: `/api/state`, `/api/tick`, `/api/disturbance`, `/api/history`, `/api/reset` |
+| `scenarios.py` | `tick()` (Case 1, auto-optimizing), `apply_stress()`/`disturbance()` (Case 2, naive — no auto-optimize), `optimize_now()`/`preview_intervention()` (AURA's separate, explicit response) |
+| `api.py` | FastAPI: `/api/state`, `/api/tick`, `/api/disturbance`, `/api/optimize`, `/api/optimize/preview`, `/api/forecast`, `/api/config`, `/api/history`, `/api/reset` |
 | `frontend/` | single-screen 3D map twin (vanilla JS, no build step) served by FastAPI at `/` |
 | `frontend/map.js` | dual-engine Mapbox/MapLibre loader + all GL layer definitions |
 | `frontend/chart.js` | inline-SVG forecast chart for the left panel |
@@ -113,13 +113,29 @@ uvicorn grid.api:app --host 127.0.0.1 --port 8000     # UI at http://127.0.0.1:8
 - **Switching is a real intervention.** When a saturated low-capacity circuit
   blocks delivery, `optimize_with_switching` opens it so parallel circuits pick
   up the flow — never the last live circuit on a corridor.
+- **Stress and optimization are two separate steps, on purpose.** A judge
+  action (`apply_stress`/`disturbance`) mutates demand or fails a line and then
+  calls `core.naive_dispatch()` — a real PTDF flow recalculation with *no*
+  redispatch, showing the unmanaged physical consequence, genuine overloads
+  included. It never calls the optimizer. `optimize_now()` is the separate,
+  explicit action that runs the real DC-OPF + validation loop and commits it.
+  `preview_intervention()` runs that same real solve with `commit=False` (the
+  LP and pandapower validation execute for real; only the final state
+  write-back is skipped) so the UI can honestly show what AURA *would* do
+  before the judge clicks anything, with zero side effects — verified by
+  hashing `/api/state` before and after a preview call.
+
 ### Frontend
 
-One screen, no modes: the forecast tick and the stress controls (temperature,
-demand, click-a-corridor-to-trip) share one left panel and one API, because both
-scenarios return the same `InterventionResult` and therefore need only one render
-path. The old full-height event log is replaced by a floating feed capped at four
-critical lines (failures, reroutes, overloads, shed, AI actions).
+A Bento-grid dashboard (`index.html`/`style.css`) built around one causal
+narrative: forecast → stress → grid impact → AURA optimizer → validation. The
+digital twin map is the largest cell; every other card is sized to its
+importance (status/demand small, forecast/alerts/optimizer medium, validation
+wide, event log narrow-tall and internally scrolling). A stress event **never**
+auto-triggers the optimizer — `[ Simulate Stress ]` and `[ AURA Rebalance ]`
+are separate, explicit actions, matching the backend split above. A technical
+details drawer (model/horizon/power-flow/optimizer/validation, plus the raw
+rejected-alternatives list) is off-canvas and secondary by design.
 
 - **Map engine is chosen at runtime.** Mapbox GL JS renders nothing without a
   token, so `/api/config` reports whether `MAPBOX_TOKEN` is set: if it is, the
@@ -132,12 +148,22 @@ critical lines (failures, reroutes, overloads, shed, AI actions).
   `length_km`, so the optimizer is bit-identical — verified by hashing the
   dispatch before and after the change. The known cost: a corridor's drawn length
   need not match its `length_km`.
-- **Substations are `fill-extrusion` columns** whose height tracks live load, so
-  demand centres grow through the day and turn red when shedding. Corridors are
-  glow + line pairs coloured by worst-circuit loading, falling back to the OGW
-  voltage-class palette when not stressed.
-- **Motion means load moved.** The animated dash layer is filtered to the
-  corridors the *last* dispatch changed, then cleared after ~2.6s.
+- **Corridors carry two independent encodings.** Thickness/sag is driven by
+  `abs(flow_mw)` normalised against the network's own current max flow —
+  *never* by capacity, so a big corridor carrying little power looks thin.
+  Colour is driven by `loading` against the five-band table `/api/config`
+  serves (`safe/elevated/high/overloaded/critical`, from `state.LOADING_BANDS`)
+  — the same thresholds the backend's `risk()` uses, so the map, the Grid
+  Alerts panel, and the legend can never disagree about what "overloaded"
+  means. Only elevated-and-above bands get glow/animation at all; a stable
+  grid deliberately looks subdued, not like a uniform glowing spiderweb.
+- **Substations are DOM antenna markers**, not a GL layer, specifically so a
+  size/colour change on re-render is an ordinary CSS transition — antenna
+  height tracks live load, colour flips to red the instant a substation sheds.
+- **An AURA-reroute overlay** (gold, temporary) marks whatever the *last*
+  optimize response's `affected_corridors` actually changed, laid on top of —
+  never instead of — the real thickness/colour, which update immediately and
+  permanently regardless of whether the overlay is still fading.
 
 - **The demo starts at a calibrated operating point.** The snapshot's flows
   satisfy conservation but not impedance physics, so the full nominal 45.8 GW is

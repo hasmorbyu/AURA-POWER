@@ -12,6 +12,7 @@ class CorridorState(BaseModel):
     flow_mw: float
     loading: float
     max_circuit_loading: float
+    flow_direction: int = 1  # +1: net flow from `from` to `to`; -1: reversed
     voltage_kv: float = 0.0
     circuits_live: int
     circuits_total: int
@@ -35,6 +36,10 @@ class RiskSummary(BaseModel):
     circuits_at_limit: int
     corridors_at_risk: int
     at_risk_corridors: list[str]
+    overloaded_corridors: int = 0
+    overloaded_corridor_keys: list[str] = []
+    stressed_substations: int = 0
+    stressed_substation_names: list[str] = []
     total_demand_mw: float
     total_served_mw: float
     total_shed_mw: float
@@ -81,6 +86,7 @@ class NetworkState(BaseModel):
     corridors: dict[str, CorridorState]
     future_corridors: list[dict]
     risk: RiskSummary
+    phase: Literal["stable", "at_risk", "overload", "shedding"] = "stable"
     demand_scale: float
     temperature_c: float | None
 
