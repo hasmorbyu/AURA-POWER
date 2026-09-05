@@ -25,7 +25,7 @@ Traditional monitoring shows what is happening now. AURA focuses on **what happe
 **3. Optimize**
 
 * Detects overloaded or high-risk network paths.
-* Recommends power-flow rerouting and load balancing.
+* Recommends power-flow rerouting and load balancing
 * Uses emergency actions only as a last resort.
 
 **4. Explain**
