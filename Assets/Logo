@@ -1,0 +1,65 @@
+<svg class="aura-logo-svg" viewBox="0 0 210 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Glow and Bloom Filters -->
+    <filter id="wire-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.5" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <radialGradient id="node-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00ffff" stop-opacity="1" />
+      <stop offset="60%" stop-color="#00ffcc" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#00ffcc" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <!-- ================= BACKGROUND POWER CABLES (Catenary Wire Sags) ================= -->
+  <!-- Top High-Voltage Transmission Line -->
+  <path d="M 0 10 Q 20 14, 21 8 Q 50 16, 65 10 Q 95 16, 110 8 Q 135 15, 153 8 Q 185 14, 210 10" 
+        stroke="rgba(0, 255, 204, 0.25)" stroke-width="1.2" fill="none"/>
+
+  <!-- Mid Bus-Tie Cable -->
+  <path d="M 0 28 Q 12 32, 21 34 Q 40 38, 65 30 Q 85 36, 110 27 Q 130 36, 153 34 Q 180 32, 210 28" 
+        stroke="rgba(0, 255, 204, 0.3)" stroke-width="1" fill="none"/>
+
+  <!-- Animated High-Voltage Current Carrier (Pulses through the wire) -->
+  <path d="M 0 10 Q 20 14, 21 8 Q 50 16, 65 10 Q 95 16, 110 8 Q 135 15, 153 8 Q 185 14, 210 10" 
+        stroke="#00ffff" stroke-width="1.5" stroke-dasharray="8 60" fill="none" filter="url(#wire-glow)">
+    <animate attributeName="stroke-dashoffset" from="200" to="0" dur="2.4s" repeatCount="indefinite" />
+  </path>
+
+  <!-- ================= THE CORE AURA TYPOGRAPHY (Conduit Style) ================= -->
+  <!-- First 'A' -->
+  <path d="M 6 46 L 17 9 C 19 3, 23 3, 25 9 L 36 46" 
+        stroke="#ffffff" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Substation Node A1 with halo -->
+  <circle cx="21" cy="34" r="6" fill="url(#node-glow)" />
+  <circle cx="21" cy="34" r="2.8" fill="#00ffff" />
+
+  <!-- 'U' High-Tension Loop -->
+  <path d="M 48 6 L 48 30 C 48 41, 56 46, 65 46 C 74 46, 82 41, 82 30 L 82 6" 
+        stroke="#ffffff" stroke-width="3.8" stroke-linecap="round"/>
+
+  <!-- 'R' Transformer Bus -->
+  <path d="M 94 46 L 94 6 L 112 6 C 122 6, 126 12, 126 19 C 126 27, 120 28, 112 28 L 94 28 M 111 28 L 126 46" 
+        stroke="#ffffff" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Second 'A' -->
+  <path d="M 138 46 L 149 9 C 151 3, 155 3, 157 9 L 168 46" 
+        stroke="#ffffff" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Substation Node A2 with halo -->
+  <circle cx="153" cy="34" r="6" fill="url(#node-glow)" />
+  <circle cx="153" cy="34" r="2.8" fill="#00ffff" />
+
+  <!-- ================= TRANSMISSION TIE-INS & TAP DROPS ================= -->
+  <!-- Vertical Feeder Drop into Node A1 -->
+  <line x1="21" y1="8" x2="21" y2="34" stroke="#00ffcc" stroke-width="1.2" stroke-dasharray="2 3" opacity="0.85"/>
+  <!-- Vertical Feeder Drop into Node A2 -->
+  <line x1="153" y1="8" x2="153" y2="34" stroke="#00ffcc" stroke-width="1.2" stroke-dasharray="2 3" opacity="0.85"/>
+
+  <!-- Busbar Intertie between U & R -->
+  <line x1="82" y1="20" x2="94" y2="20" stroke="#00ffff" stroke-width="1.5" filter="url(#wire-glow)"/>
+</svg>
